@@ -1,23 +1,12 @@
 package com.thinkgem.jeesite.activemq.send;
 
 
-import javax.jms.Connection;
-import javax.jms.ConnectionFactory;
-import javax.jms.JMSException;
-import javax.jms.Message;
-import javax.jms.MessageConsumer;
-import javax.jms.MessageListener;
-import javax.jms.MessageProducer;
-import javax.jms.Queue;
-import javax.jms.Session;
-import javax.jms.TextMessage;
-import javax.jms.Topic;
-
 import org.apache.activemq.ActiveMQConnectionFactory;
-import org.apache.activemq.command.ActiveMQTextMessage;
 import org.junit.Test;
 
-public class TestActiveMq {
+import javax.jms.*;
+
+public class PersistenceSender {
 
     //queue
     //Producer
@@ -96,7 +85,7 @@ public class TestActiveMq {
         connection.close();
     }
 
-    //topic
+    //持久化topic，接收者没启动，发送后，上线依然能获取
     //Producer
     @Test
     public void testTopicProducer() throws Exception {
@@ -104,14 +93,17 @@ public class TestActiveMq {
         ConnectionFactory connectionFactory = new ActiveMQConnectionFactory("tcp://192.168.25.168:61616");
         //创建连接
         Connection connection = connectionFactory.createConnection();
-        //开启连接
-        connection.start();
+
         //创建Session
         Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
         //创建Destination，应该使用topic
         Topic topic = session.createTopic("test-topic");
         //创建一个Producer对象
         MessageProducer producer = session.createProducer(topic);
+        //持久化设置
+        producer.setDeliveryMode(DeliveryMode.PERSISTENT);
+        //开启连接
+        connection.start();
         //创建一个TextMessage对象
         TextMessage textMessage = session.createTextMessage("hello activemq topic");
         //发送消息
@@ -121,21 +113,27 @@ public class TestActiveMq {
         session.close();
         connection.close();
     }
-
+//一定要先运行一次
     @Test
     public void testTopicConsumser() throws Exception {
         //创建一个连接工厂对象
         ConnectionFactory connectionFactory = new ActiveMQConnectionFactory("tcp://192.168.25.168:61616");
         //使用连接工厂对象创建一个连接
         Connection connection = connectionFactory.createConnection();
-        //开启连接
-        connection.start();
+       //======注册客户端=====
+        connection.setClientID("cc1");
+
         //使用连接对象创建一个Session对象
         Session session = connection.createSession(false, Session.AUTO_ACKNOWLEDGE);
         //使用Session创建一个Destination，Destination应该和消息的发送端一致。
         Topic topic = session.createTopic("test-topic");
+        //=====设置持久化订阅者====
+        TopicSubscriber consumer = session.createDurableSubscriber(topic,"T1");
+        //设置后再，开启连接
+        connection.start();
+
         //使用Session创建一个Consumer对象
-        MessageConsumer consumer = session.createConsumer(topic);
+   /*     MessageConsumer consumer = session.createConsumer(topic);*/
         //向Consumer对象中设置一个MessageListener对象，用来接收消息
         consumer.setMessageListener(new MessageListener() {
 
